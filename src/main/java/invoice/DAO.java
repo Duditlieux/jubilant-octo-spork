@@ -34,7 +34,7 @@ public class DAO {
 		String sql = "SELECT SUM(Total) AS Amount FROM Invoice WHERE CustomerID = ?";
 		float result = 0;
 		try (Connection connection = myDataSource.getConnection();
-			PreparedStatement statement = connection.prepareStatement(sql)) {
+				PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setInt(1, id); // On fixe le 1° paramètre de la requête
 			try (ResultSet resultSet = statement.executeQuery()) {
 				if (resultSet.next()) {
@@ -56,7 +56,7 @@ public class DAO {
 		String sql = "SELECT LastName FROM Customer WHERE ID = ?";
 		String result = null;
 		try (Connection connection = myDataSource.getConnection();
-			PreparedStatement statement = connection.prepareStatement(sql)) {
+				PreparedStatement statement = connection.prepareStatement(sql)) {
 			statement.setInt(1, id);
 			try (ResultSet resultSet = statement.executeQuery()) {
 				if (resultSet.next()) {
@@ -70,15 +70,51 @@ public class DAO {
 	/**
 	 * Transaction permettant de créer une facture pour un client
 	 *
-	 * @param customer Le client
+	 * @param customer   Le client
 	 * @param productIDs tableau des numéros de produits à créer dans la facture
-	 * @param quantities tableau des quantités de produits à facturer faux sinon Les deux tableaux doivent avoir la même
-	 * taille
+	 * @param quantities tableau des quantités de produits à facturer faux sinon
+	 *                   Les deux tableaux doivent avoir la même taille
 	 * @throws java.lang.Exception si la transaction a échoué
 	 */
-	public void createInvoice(CustomerEntity customer, int[] productIDs, int[] quantities)
-		throws Exception {
-		throw new UnsupportedOperationException("Pas encore implémenté");
+	public void createInvoice(CustomerEntity customer, int[] productIDs, int[] quantities) {
+		String sqlInvoice = "INSERT INTO Invoice(CustomerID) VALUES(?)";
+		String sqlItem = "INSERT INTO Item(InvoiceID,ProductID,Quantity,Cost,Item) VALUES(?,?,?,?,?)";
+		String sqlPrice = "SELECT Price FROM Product WHERE ID = (?)";
+
+		try (Connection connection = myDataSource.getConnection();
+				PreparedStatement invoiceStatement = connection.prepareStatement(sqlInvoice, Statement.RETURN_GENERATED_KEYS);//on g�n�re une clef automatiquement
+				PreparedStatement itemStatement = connection.prepareStatement(sqlItem);
+				PreparedStatement productPrice = connection.prepareStatement(sqlPrice)) {
+			connection.setAutoCommit(false);
+			try {
+				invoiceStatement.setInt(1, customer.getCustomerId());
+				invoiceStatement.executeUpdate();
+
+				ResultSet result = invoiceStatement.getGeneratedKeys();
+				result.next();
+				int inVoiceId = result.getInt(1);
+
+				for (int i = 0; i < productIDs.length; i++) {
+					int currentId = productIDs[i];
+					
+					productPrice.setInt(1, currentId);
+					ResultSet result1 = productPrice.executeQuery();
+					result1.next();
+
+					itemStatement.setInt(1, inVoiceId);
+					itemStatement.setInt(2, currentId);
+					itemStatement.setInt(3, quantities[i]);
+					itemStatement.setInt(4, result1.getInt(1));
+					itemStatement.setInt(5, i);
+					itemStatement.executeUpdate();
+				}
+				connection.commit();
+			} catch (Exception ex) {
+				connection.rollback();
+				throw ex;
+			}
+
+		}
 	}
 
 	/**
@@ -90,8 +126,7 @@ public class DAO {
 		int result = 0;
 
 		String sql = "SELECT COUNT(*) AS NUMBER FROM Customer";
-		try (Connection connection = myDataSource.getConnection();
-			Statement stmt = connection.createStatement()) {
+		try (Connection connection = myDataSource.getConnection(); Statement stmt = connection.createStatement()) {
 			ResultSet rs = stmt.executeQuery(sql);
 			if (rs.next()) {
 				result = rs.getInt("NUMBER");
@@ -112,7 +147,7 @@ public class DAO {
 		String sql = "SELECT COUNT(*) AS NUMBER FROM Invoice WHERE CustomerID = ?";
 
 		try (Connection connection = myDataSource.getConnection();
-			PreparedStatement stmt = connection.prepareStatement(sql)) {
+				PreparedStatement stmt = connection.prepareStatement(sql)) {
 			stmt.setInt(1, customerId);
 			ResultSet rs = stmt.executeQuery();
 			if (rs.next()) {
@@ -126,7 +161,8 @@ public class DAO {
 	 * Trouver un Customer à partir de sa clé
 	 *
 	 * @param customedID la clé du CUSTOMER à rechercher
-	 * @return l'enregistrement correspondant dans la table CUSTOMER, ou null si pas trouvé
+	 * @return l'enregistrement correspondant dans la table CUSTOMER, ou null si pas
+	 *         trouvé
 	 * @throws SQLException
 	 */
 	CustomerEntity findCustomer(int customerID) throws SQLException {
@@ -134,7 +170,7 @@ public class DAO {
 
 		String sql = "SELECT * FROM Customer WHERE ID = ?";
 		try (Connection connection = myDataSource.getConnection();
-			PreparedStatement stmt = connection.prepareStatement(sql)) {
+				PreparedStatement stmt = connection.prepareStatement(sql)) {
 			stmt.setInt(1, customerID);
 
 			ResultSet rs = stmt.executeQuery();
@@ -159,7 +195,7 @@ public class DAO {
 
 		String sql = "SELECT * FROM Customer WHERE City = ?";
 		try (Connection connection = myDataSource.getConnection();
-			PreparedStatement stmt = connection.prepareStatement(sql)) {
+				PreparedStatement stmt = connection.prepareStatement(sql)) {
 			stmt.setString(1, city);
 			try (ResultSet rs = stmt.executeQuery()) {
 				while (rs.next()) {
